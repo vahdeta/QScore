@@ -55,9 +55,10 @@ class Permutations:
 
         # Get the number of frames in the original data
         num_frames = original_image.shape[3]
+        tr_time = original_image.header['pixdim'][4]
 
         # Run FSL feat on new design file
-        self.run_feat(original_image_file_path, self.design_file_path, self.analysis_path)
+        self.run_feat(num_frames, tr_time, original_image_file_path, self.design_file_path, self.analysis_path)
 
         num_permuted_frames = int(math.ceil(self.percent_to_permute * num_frames))
 
@@ -65,16 +66,17 @@ class Permutations:
         with ThreadPoolExecutor(max_workers=self.num_threads) as executor:
             for i in range(self.iterations):
                 iteration_path = self.output_data_path / f"permutation_{i}"
-                executor.submit(self.run_permutations_with_feat, num_permuted_frames, num_frames, iteration_path)
+                executor.submit(self.run_permutations_with_feat, num_permuted_frames, num_frames, tr_time, iteration_path)
 
 
-    def run_permutations_with_feat(self, num_permuted_frames: int, num_frames: int, iteration_path: Path):
+    def run_permutations_with_feat(self, num_permuted_frames: int, num_frames: int, tr_time: float, iteration_path: Path):
         """
         Run permutation on single iteration with FSL feat
 
         Args:
-            permuted_amt: Percentage of frames to permute
             num_permuted_frames: Number of frames to permute
+            num_frames: Number of frames in the data file
+            tr_time: TR time of the data file
             iteration_path: Path to directory where permutation data will be written
         """
 
@@ -96,14 +98,16 @@ class Permutations:
         # Save the confound vector to a file
         np.savetxt(confound_file_path, confound_vector, delimiter=' ', fmt='%d')
 
-        self.run_feat(self.filtered_data, self.design_file_with_confound_path, iteration_path, confound_file_path)
+        self.run_feat(num_frames, tr_time, self.filtered_data, self.design_file_with_confound_path, iteration_path, confound_file_path)
 
 
-    def run_feat(self, data_file_path, design_file_path, analysis_path, confound_file_path=None):
+    def run_feat(self, num_frames: int, tr_time: float, data_file_path: Path, design_file_path: Path, analysis_path: Path, confound_file_path=None):
         """
         Adjust design file as needed and launch FSL feat
 
         Args:
+            num_frames: Number of frames in the data file
+            tr_time: TR time of the data file
             data_file_path: Path to NIFTI file that will be analyzed
             design_file_path: Path to .fsf file that will be used for analysis
             analysis_path: Path to directory where FEAT files will be output 
@@ -116,6 +120,8 @@ class Permutations:
             'set fmri(outputdir) ': f'set fmri(outputdir) "{analysis_path}"',
             'set feat_files(1) ': f'set feat_files(1) "{data_file_path}"',
             'set confoundev_files(1) ': f'set confoundev_files(1) "{confound_file_path}"',
+            'set fmri(tr) ': f'set fmri(tr) {tr_time}',
+            'set fmri(npts) ': f'set fmri(npts) {num_frames}',
         }
 
         with open(design_file_path, 'r') as old_design_file, open(new_design_file_path, 'w') as new_design_file:
