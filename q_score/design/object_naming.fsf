@@ -311,7 +311,7 @@ set fmri(tempfilt_yn1) 1
 set fmri(deriv_yn1) 1
 
 # Custom EV file (EV 1)
-set fmri(custom1) "/app/q_score/design/object_naming_events.txt"    
+set fmri(custom1) "/app/q_score/design/object_naming_events.txt"
 
 # Gamma sigma (EV 1)
 set fmri(gammasigma1) 3

@@ -279,7 +279,7 @@ set feat_files(1)  "/app/q_score/design"
 set fmri(confoundevs) 1
 
 # Confound EVs text file for analysis
-set confoundev_files(1) "app/q_score/design/object_naming_events.txt"
+set confoundev_files(1) "/app/q_score/design/object_naming_events.txt"
 
 # EV 1 title
 set fmri(evtitle1) "Object_Naming"

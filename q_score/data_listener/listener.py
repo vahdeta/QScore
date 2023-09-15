@@ -2,6 +2,7 @@ import os
 import json
 import time
 import queue
+import logging
 import subprocess
 from pathlib import Path
 from watchdog.observers import Observer
@@ -9,6 +10,9 @@ from watchdog.events import FileSystemEventHandler
 
 # Define a queue for file paths to be analyzed
 analysis_queue = queue.Queue()
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 
 def process_json_file(file_path):
     """
@@ -34,13 +38,22 @@ def process_json_file(file_path):
             os.remove(file_path)
 
     except Exception as e:
-        print(f"Error processing JSON file {file_path}: {str(e)}")
+        logging.error(f"Error processing JSON file {file_path}: {str(e)}")
 
 # Define a custom event handler to watch for file creation in /incoming
 class JSONFileHandler(FileSystemEventHandler):
+    """
+    Watchdog class for handling events in JSON listener directory
+    """            
     def on_created(self, event):
+        """
+        Handle file creation events for JSONs
+        """
+
+        if event.is_directory:
+            return None
         if event.src_path.endswith('.json'):
-            print("NEW JSON FILE DETECTED")
+            logging.info("New JSON file detected")
             process_json_file(event.src_path)
 
 def start_listener(json_directory: Path):
@@ -56,16 +69,22 @@ def start_listener(json_directory: Path):
     observer.schedule(event_handler, path=json_directory, recursive=False)
     observer.start()
     
+    logging.info(f"Started listening for JSON files in {json_directory}")
+
     try:
         while True:
             # Check if there are files in the analysis queue to process
             if not analysis_queue.empty():  
 
                 # Get the dicom directory path to analyze
-                paths_to_analyze = analysis_queue.get()
+                path_to_analyze = analysis_queue.get()
+
+                logging.info(f"Analyzing dicom files in {path_to_analyze}")
 
                 # Make call to analysis script
-                call_analysis_script(paths_to_analyze)
+                call_analysis_script(path_to_analyze)
+
+                logging.info(f"Finished analysis for {path_to_analyze}")
 
             time.sleep(1)
     except KeyboardInterrupt:
@@ -80,8 +99,6 @@ def call_analysis_script(dicom_file_path):
         dicom_file_path: Path to DICOM file to be analyzed
     """
 
-    print(f"Analyzing {dicom_file_path}")
-
     q_score_path = str(os.environ.get("QSCORE_PATH", '/app/qscore'))
     path_to_script = f'{q_score_path}/run_analysis.py'
 
@@ -89,8 +106,6 @@ def call_analysis_script(dicom_file_path):
 
     # Run command
     try:
-        print("RUNNING COMMAND")
         subprocess.run(command, text=True)
-        print("AFTER COMMAND COMPLETION")
     except:
         raise Exception(f"Error running command {command}")

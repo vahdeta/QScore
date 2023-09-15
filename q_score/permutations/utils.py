@@ -1,11 +1,11 @@
-# Script for ingesting DICOM data from specified file location and converting it to NIFTI file
-from pathlib import Path
-import nibabel as nib
-import subprocess
 import os
+import logging
 import requests
-from nipype.interfaces import fsl
+import subprocess
+from pathlib import Path
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 
 def read_dicoms(input_directory: Path, output_directory: Path):
     """
@@ -14,12 +14,12 @@ def read_dicoms(input_directory: Path, output_directory: Path):
 
     Returns: None if successful, error message if not
     """
-    print("Reading dicoms")
+
     # Make sure output directory exists
     if not output_directory.exists():
         output_directory.mkdir(parents=True, exist_ok=True)
 
-    print("Running dcm2niix")
+    logging.info("Running dcm2niix on dicom path")
     # Convert dicoms to NIFTI and output to directory
     command = f"dcm2niix -o {output_directory} {input_directory}"
 
@@ -46,6 +46,7 @@ def get_nifti_name(input_directory: Path):
     try:
         nifti_file = [file for file in files if file.endswith(".nii")][0]
     except:
+        logging.error("No NIFTI file found in directory")
         raise Exception("No NIFTI file found in directory")
 
     nifti_file_name = Path(nifti_file).name

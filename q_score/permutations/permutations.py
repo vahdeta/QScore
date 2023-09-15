@@ -1,6 +1,7 @@
 import math
-from concurrent.futures import ThreadPoolExecutor
+import logging
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 from scipy.spatial import distance
 import nibabel as nib
@@ -23,20 +24,27 @@ class Permutations:
         
         self.output_data_path = output_data_path
         self.analysis_path = self.output_data_path / "real"
-        self.filtered_data = self.output_data_path / "real.feat/filtered_func_data"
 
-        # TODO: put the following in a toml file
-        self.num_threads = 10
-        self.iterations = 10
-        self.percent_to_permute = .1
-        self.contrast_num = 1
-
-
-    def start_permutations(self):
-        print("PERMUTATIONS STARTED")
         # Make sure analysis path directory exists
         if not self.analysis_path.exists():
             self.analysis_path.mkdir(parents=True, exist_ok=True)
+
+        self.filtered_data = self.output_data_path / "real.feat/filtered_func_data"
+
+        self.num_threads = 10
+        self.iterations = 20
+        self.percent_to_permute = .1
+        self.contrast_num = 1
+
+        # Logging setup
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    def start_permutations(self):
+        """
+        Method to start permutation thread pool and run feat
+        """
+
+        logging.info("Starting permutations")
 
         # Look into data file path and get the name of the nifti file
         nifti_name = get_nifti_name(self.output_data_path)
@@ -49,12 +57,10 @@ class Permutations:
         num_frames = original_image.shape[3]
 
         # Run FSL feat on new design file
-        print("Running feat on new design file")
         self.run_feat(original_image_file_path, self.design_file_path, self.analysis_path)
 
         num_permuted_frames = int(math.ceil(self.percent_to_permute * num_frames))
 
-        print("STARTING THREAD POOL")
         # Start the permutations in a thread pool
         with ThreadPoolExecutor(max_workers=self.num_threads) as executor:
             for i in range(self.iterations):
@@ -64,11 +70,15 @@ class Permutations:
 
     def run_permutations_with_feat(self, num_permuted_frames: int, num_frames: int, iteration_path: Path):
         """
-        permuted_amt: Percentage of frames to permute
-        num_permuted_frames: Number of frames to permute
-        iteration_path: Path to directory where permutation data will be written
+        Run permutation on single iteration with FSL feat
+
+        Args:
+            permuted_amt: Percentage of frames to permute
+            num_permuted_frames: Number of frames to permute
+            iteration_path: Path to directory where permutation data will be written
         """
-        print(f"RUNNING PERMUTATION FOR {iteration_path}")
+
+        logging.info(f"Running permutation for {iteration_path}")
 
         # Randomly permute the frames, and select a subset of the randomly selected frames
         random_frame_order = np.random.permutation(num_frames)
@@ -89,13 +99,15 @@ class Permutations:
         self.run_feat(self.filtered_data, self.design_file_with_confound_path, iteration_path, confound_file_path)
 
 
-
     def run_feat(self, data_file_path, design_file_path, analysis_path, confound_file_path=None):
         """
-        data_file_path: Path to NIFTI file that will be analyzed
-        design_file_path: Path to .fsf file that will be used for analysis
-        analysis_path: Path to directory where FEAT files will be output 
-        confound_file_path: Path to confound file that will be used for analysis, if applicable
+        Adjust design file as needed and launch FSL feat
+
+        Args:
+            data_file_path: Path to NIFTI file that will be analyzed
+            design_file_path: Path to .fsf file that will be used for analysis
+            analysis_path: Path to directory where FEAT files will be output 
+            confound_file_path: Path to confound file that will be used for analysis, if applicable
         """
 
         new_design_file_path = f"{analysis_path}_new.fsf"
@@ -104,7 +116,6 @@ class Permutations:
             'set fmri(outputdir) ': f'set fmri(outputdir) "{analysis_path}"',
             'set feat_files(1) ': f'set feat_files(1) "{data_file_path}"',
             'set confoundev_files(1) ': f'set confoundev_files(1) "{confound_file_path}"',
-            'set fmri(custom1) ': f'set fmri(custom1) "{self.base_folder}/design/{self.task_type}.txt"',
         }
 
         with open(design_file_path, 'r') as old_design_file, open(new_design_file_path, 'w') as new_design_file:
@@ -117,17 +128,18 @@ class Permutations:
                 if not found:
                     new_design_file.write(line)
 
-        # Run feat on new design file
-        print("Running feat on new design file")
+        logging.info(f"Running feat on new design file {new_design_file_path}")
         feat = fsl.FEAT()
         feat.inputs.fsf_file = new_design_file_path
         feat.run()
-
     
     def get_q_score(self):
+        """
+        Calculate the q score from the permuted data
 
-        #iteration_similarity_lowertri = np.tril(np.ones((self.iterations, self.iterations)), k=-1)
-        iteration_similarity_lowertri = np.tril_indices(self.iterations, k=-1)
+        Returns:
+            q_score: The q score for the permutation test
+        """
 
         # Load the mask from the feat file
         mask_nii = nib.load(f'{self.output_data_path}/real.feat/mask.nii.gz')
@@ -147,6 +159,7 @@ class Permutations:
         similarity_mat = 1 - distance.cdist(all_data_mat.T, all_data_mat.T, 'correlation')
 
         # Extract the lower triangular values
+        iteration_similarity_lowertri = np.tril_indices(self.iterations, k=-1)
         similarities = similarity_mat[iteration_similarity_lowertri]
 
         # Calculate the mean similarity divided by the standard deviation of similarities
