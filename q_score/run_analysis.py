@@ -54,7 +54,7 @@ if __name__ == "__main__":
 
     # Send q score to localhost for other Docker container to pick up
     logging.info("Sending q score to localhost")
-    post_q_score(q_score, args.condition)
+    post_q_score(args.condition, q_score)
 
     # Remove output directory
     os.system(f"rm -rf {output_directory}")
