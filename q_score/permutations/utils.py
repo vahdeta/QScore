@@ -53,7 +53,7 @@ def get_nifti_name(input_directory: Path):
 
     return nifti_file_name
 
-def post_q_score(series_number: int, q_score: int):
+def post_q_score(series_number: str, q_score: int):
     """
     series_number: Series number that data originated from
     q_scr: Q score to be posted
