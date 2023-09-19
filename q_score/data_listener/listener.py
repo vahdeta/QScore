@@ -8,6 +8,8 @@ from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+from q_score import run_analysis
+
 # Define a queue for file paths to be analyzed
 analysis_queue = queue.Queue()
 
@@ -26,13 +28,7 @@ def process_json_file(file_path):
         with open(file_path, 'r') as json_file:
 
             data = json.load(json_file)
-
-            # Get unique parent directories from the file paths
-            parent_directories = list(set([Path(file_path).parent for file_path in data['dicoms']]))
-
-            # Add the file paths to the analysis queue
-            for parent_directory in parent_directories:
-                analysis_queue.put(parent_directory)
+            analysis_queue.put(data)
 
             # Remove the JSON file
             os.remove(file_path)
@@ -45,7 +41,7 @@ class JSONFileHandler(FileSystemEventHandler):
     """
     Watchdog class for handling events in JSON listener directory
     """            
-    def on_created(self, event):
+    def on_closed(self, event):
         """
         Handle file creation events for JSONs
         """
@@ -61,7 +57,7 @@ def start_listener(json_directory: Path):
     Start listening for JSON files in the incoming directory and add them to the analysis queue
 
     Args:
-        json_directory: Path contaning to where JSON files will be written
+        json_directory: Path containing to where JSON files will be written
     """
 
     event_handler = JSONFileHandler()
@@ -77,14 +73,15 @@ def start_listener(json_directory: Path):
             if not analysis_queue.empty():  
 
                 # Get the dicom directory path to analyze
-                path_to_analyze = analysis_queue.get()
+                data_to_analyze = analysis_queue.get()
 
-                logging.info(f"Analyzing dicom files in {path_to_analyze}")
+                logging.info(f"Analyzing dicom files for series: {data_to_analyze['SeriesNumber']}")
 
                 # Make call to analysis script
-                call_analysis_script(path_to_analyze)
+                run_analysis.run(data_to_analyze)
+                # call_analysis_script(path_to_analyze)
 
-                logging.info(f"Finished analysis for {path_to_analyze}")
+                logging.info(f"Finished analysis for series {data_to_analyze['SeriesNumber']}")
 
             time.sleep(1)
     except KeyboardInterrupt:

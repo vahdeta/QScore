@@ -1,5 +1,9 @@
+import json
 import os
 import logging
+import shutil
+from typing import List
+import uuid
 import requests
 import subprocess
 from pathlib import Path
@@ -7,7 +11,8 @@ from pathlib import Path
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 
-def read_dicoms(input_directory: Path, output_directory: Path):
+
+def read_dicoms(dicom_path_list: List[Path], output_directory: Path) -> str:
     """
     input_directory: Path to directory containing DICOM files
     output_directory: Path to directory where NIFTI files will be output
@@ -15,13 +20,20 @@ def read_dicoms(input_directory: Path, output_directory: Path):
     Returns: None if successful, error message if not
     """
 
+    # Generate a temporary directory to hold the dicoms for this series
+    temp_dicom_dir = Path(f"/tmp/{uuid.uuid4()}")
+    temp_dicom_dir.mkdir()
+
+    for dicom_file_path in dicom_path_list:
+        shutil.copy(dicom_file_path, temp_dicom_dir)
+
     # Make sure output directory exists
     if not output_directory.exists():
         output_directory.mkdir(parents=True, exist_ok=True)
 
     logging.info("Running dcm2niix on dicom path")
     # Convert dicoms to NIFTI and output to directory
-    command = f"dcm2niix -o {output_directory} {input_directory}"
+    command = f"dcm2niix -o {output_directory} {temp_dicom_dir}"
 
     # Run command
     try:
@@ -29,8 +41,12 @@ def read_dicoms(input_directory: Path, output_directory: Path):
     except:
         dicom_processing_error = "Error running dcm2niix command"
         return dicom_processing_error
-    
+
+    # Remove output directory
+    os.system(f"rm -rf {temp_dicom_dir}")
+
     return None
+
 
 def get_nifti_name(input_directory: Path):
     """
@@ -53,20 +69,17 @@ def get_nifti_name(input_directory: Path):
 
     return nifti_file_name
 
-def post_q_score(series_number: str, q_score: int):
+
+def post_q_score(series_number: int, q_score: int):
     """
     series_number: Series number that data originated from
     q_scr: Q score to be posted
 
     Returns: Status code of post request
     """
-
     url = "http://localhost:5000/data/q_score"
-    data = {
-        "SeriesNumber": series_number,
-        "QScore": q_score
-    }
-
+    data = {"SeriesNumber": series_number, "QScore": q_score}
     response = requests.post(url, json=data)
+    logging.info("Request Response: " + response.text)
 
     return response.status_code

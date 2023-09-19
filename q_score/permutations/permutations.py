@@ -1,12 +1,13 @@
 import math
 import logging
+import os
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 from scipy.spatial import distance
 import nibabel as nib
 from nipype.interfaces import fsl
-from permutations.utils import get_nifti_name
+from q_score.permutations.utils import get_nifti_name
 
 class Permutations:
     def __init__(self, base_folder: Path, output_data_path: Path, task_type: str):
@@ -32,7 +33,7 @@ class Permutations:
         self.filtered_data = self.output_data_path / "real.feat/filtered_func_data"
 
         self.num_threads = 10
-        self.iterations = 20
+        self.iterations = int(os.environ['Q_SCORE_PERMUTATIONS'])
         self.percent_to_permute = .1
         self.contrast_num = 1
 

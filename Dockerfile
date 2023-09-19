@@ -28,6 +28,6 @@ COPY . /app/
 
 ENV QSCORE_PATH /app/q_score
 ENV DATA_DIR /incoming
-ENV JSON_DIR /incoming
+ENV JSON_DIR /q_requests
 
 CMD ["python3","-u", "main.py"]
