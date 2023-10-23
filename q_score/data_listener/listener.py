@@ -79,7 +79,6 @@ def start_listener(json_directory: Path):
 
                 # Make call to analysis script
                 run_analysis.run(data_to_analyze)
-                # call_analysis_script(path_to_analyze)
 
                 logging.info(f"Finished analysis for series {data_to_analyze['SeriesNumber']}")
 
@@ -87,22 +86,3 @@ def start_listener(json_directory: Path):
     except KeyboardInterrupt:
         observer.stop()
     observer.join()
-
-def call_analysis_script(dicom_file_path):
-    """
-    Call the analysis script to analyze a DICOM file
-
-    Args:
-        dicom_file_path: Path to DICOM file to be analyzed
-    """
-
-    q_score_path = str(os.environ.get("QSCORE_PATH", '/app/qscore'))
-    path_to_script = f'{q_score_path}/run_analysis.py'
-
-    command = ["python3", path_to_script, dicom_file_path]
-
-    # Run command
-    try:
-        subprocess.run(command, text=True)
-    except:
-        raise Exception(f"Error running command {command}")

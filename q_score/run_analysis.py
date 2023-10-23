@@ -4,15 +4,13 @@ import uuid
 import logging
 import argparse
 from pathlib import Path
-from q_score.permutations.permutations import Permutations
-from q_score.permutations.utils import read_dicoms, post_q_score
+from permutations.permutations import Permutations
+from permutations.utils import convert_dicoms, get_series_description, post_q_score
+import time
 
 
 def run(
-    dicom_data,
-    *,
-    task_type: str = "object_naming",
-    condition: str = "CON1",
+    dicom_data
 ):
     # Set logging level
     logging.basicConfig(
@@ -26,11 +24,14 @@ def run(
     logging.info(f"Set output directory: {output_directory}")
 
     # Read dicoms to NIFTI format
-    dicom_read_status = read_dicoms(dicom_data["Dicoms"], output_directory)
+    dicom_read_status = convert_dicoms(dicom_data["Dicoms"], output_directory)
 
     if dicom_read_status is not None:
         logging.error("Error reading dicoms")
         exit(1)
+
+    # Get the Series Description from the DICOM file
+    task_name = get_series_description(dicom_data["Dicoms"])
 
     # base folder is current directory
     base_folder = Path(os.environ.get("QSCORE_PATH", "/app/q_score"))
@@ -39,7 +40,7 @@ def run(
     permutations = Permutations(
         base_folder=base_folder,
         output_data_path=output_directory,
-        task_type=task_type,
+        task_type=task_name,
     )
 
     permutations.start_permutations()

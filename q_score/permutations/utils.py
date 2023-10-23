@@ -4,6 +4,7 @@ import logging
 import shutil
 from typing import List
 import uuid
+import pydicom
 import requests
 import subprocess
 from pathlib import Path
@@ -12,7 +13,7 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 
 
-def read_dicoms(dicom_path_list: List[Path], output_directory: Path) -> str:
+def convert_dicoms(dicom_path_list: List[Path], output_directory: Path) -> str:
     """
     input_directory: Path to directory containing DICOM files
     output_directory: Path to directory where NIFTI files will be output
@@ -47,6 +48,32 @@ def read_dicoms(dicom_path_list: List[Path], output_directory: Path) -> str:
 
     return None
 
+def get_series_description(dicom_path_list: List[Path]):
+    """
+    input_directory: Path to directory containing DICOM files
+    
+    Returns: task_name: str
+    """
+
+    # Get the first dicom file in the directory
+    dicom_file_path = dicom_path_list[0]
+
+    # Read the DICOM file
+    try:
+        dicom_data = pydicom.dcmread(dicom_file_path)
+    except:
+        logging.error("Error reading DICOM file during series description extraction")
+        raise Exception("Error reading DICOM file")
+
+    series_description = dicom_data.SeriesDescription.split("_")
+    task_name = series_description[1].lower()
+    
+    # Make sure that task name is either objnam or motor
+    if task_name not in ["objnam", "motor"]:
+        logging.error("Task name not objnam or motor, defaulting to objnam")
+        task_name = "objnam"
+
+    return task_name
 
 def get_nifti_name(input_directory: Path):
     """
