@@ -45,7 +45,7 @@ class JSONFileHandler(FileSystemEventHandler):
     """
     Watchdog class for handling events in JSON listener directory
     """            
-    def on_created(self, event):
+    def on_closed(self, event):
         """
         Handle file creation events for JSONs
         """

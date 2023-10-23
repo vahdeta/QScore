@@ -1,13 +1,14 @@
 FROM ubuntu:22.04
 
 RUN apt-get update && \
-    apt-get install -y wget file nano dcm2niix python3 python3-pip
+    apt-get install -y wget file nano dcm2niix python3 python3-pip strace
 
 RUN apt-get install -y libgl1-mesa-dev && \
     wget https://fsl.fmrib.ox.ac.uk/fsldownloads/fslinstaller.py && \
     python3 fslinstaller.py -d /opt/fsl
 
-RUN pip install nipype nibabel scipy numpy watchdog
+RUN pip install nipype nibabel scipy numpy watchdog pydicom
+
 
 # FSL env variables
 ENV FSLDIR=/opt/fsl
@@ -19,11 +20,11 @@ ENV FSLWISH=${FSLDIR}/bin/wish
 ENV FSLGECUDAQ=cuda.q
 ENV FSL_LOAD_NIFTI_EXTENSIONS=0
 ENV FSL_SKIP_GLOBAL=0
+ENV OPENBLAS_NUM_THREADS=1
 ENV PATH=${FSLDIR}/share/fsl/bin:${PATH}
 ENV USER=""
 
 WORKDIR /app
-
 COPY . /app/
 
 ENV QSCORE_PATH /app/q_score

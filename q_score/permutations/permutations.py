@@ -4,6 +4,7 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 from scipy.spatial import distance
+from scipy.interpolate import interp1d
 import nibabel as nib
 from nipype.interfaces import fsl
 from permutations.utils import get_nifti_name
@@ -19,9 +20,9 @@ class Permutations:
 
         self.base_folder = base_folder
         self.task_type = task_type
-        self.design_file_path = self.base_folder / f"design/{self.task_type}.fsf"
-        self.design_file_with_confound_path = self.base_folder / f"design/{self.task_type}_with_confounds.fsf"
-        
+        self.design_file_path = self.base_folder / f"design/{self.task_type}/{self.task_type}.fsf"
+        self.design_file_with_confound_path = self.base_folder / f"design/{self.task_type}/{self.task_type}_with_confounds.fsf"
+
         self.output_data_path = output_data_path
         self.analysis_path = self.output_data_path / "real"
 
@@ -52,13 +53,31 @@ class Permutations:
         # Load the original data as a nifti with nibabel
         original_image_file_path = self.output_data_path / nifti_name
         original_image = nib.load(original_image_file_path)
-
-        # Get the number of frames in the original data
-        num_frames = original_image.shape[3]
         tr_time = original_image.header['pixdim'][4]
 
-        # Run FSL feat on new design file
-        self.run_feat(num_frames, tr_time, original_image_file_path, self.design_file_path, self.analysis_path)
+        # Truncate the original data by 4 frames
+        truncated_image = original_image.slicer[:,:,:,:-4]
+        truncated_image_file_path = self.output_data_path / "truncated.nii.gz"
+        nib.save(truncated_image, truncated_image_file_path)
+        num_frames = truncated_image.shape[3]
+
+        # Run brain extraction on truncated data
+        bet_image_file_path = self.output_data_path / "truncated_bet.nii.gz"
+        bet = fsl.BET()
+        bet.inputs.in_file = truncated_image_file_path
+        bet.inputs.out_file = bet_image_file_path
+        bet.inputs.functional = True
+        bet.run()
+
+        # Run mcflirt on truncated data
+        mcflirt_image_file_path = self.output_data_path / "truncated_bet_mcf.nii.gz"
+        mcflirt = fsl.MCFLIRT()
+        mcflirt.inputs.in_file = bet_image_file_path
+        mcflirt.inputs.out_file = mcflirt_image_file_path
+        mcflirt.run()
+
+        # Run feat on the truncated data
+        self.run_feat(num_frames, tr_time, mcflirt_image_file_path, self.design_file_path, self.analysis_path)
 
         num_permuted_frames = int(math.ceil(self.percent_to_permute * num_frames))
 
@@ -113,6 +132,7 @@ class Permutations:
             analysis_path: Path to directory where FEAT files will be output 
             confound_file_path: Path to confound file that will be used for analysis, if applicable
         """
+        logging.info(f"Running feat on {data_file_path}")
 
         new_design_file_path = f"{analysis_path}_new.fsf"
 

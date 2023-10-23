@@ -4,7 +4,8 @@ import logging
 import argparse
 from pathlib import Path
 from permutations.permutations import Permutations
-from permutations.utils import read_dicoms, post_q_score
+from permutations.utils import convert_dicoms, get_series_description, post_q_score
+import time
 
 if __name__ == "__main__":
 
@@ -29,12 +30,15 @@ if __name__ == "__main__":
     output_directory.mkdir(parents=True, exist_ok=True)
     logging.info(f"Set output directory: {output_directory}")
 
-    # Read dicoms to NIFTI format
-    dicom_read_status = read_dicoms(input_directory, output_directory)
+    # Convert dicoms to NIFTI format
+    dicom_read_status = convert_dicoms(input_directory, output_directory)
 
     if dicom_read_status is not None:
         logging.error("Error reading dicoms")
         exit(1)
+
+    # Get the Series Description from the DICOM file
+    task_name = get_series_description(input_directory)
 
     # base folder is current directory
     base_folder = Path(os.environ.get("QSCORE_PATH", "/app/q_score"))
@@ -43,7 +47,7 @@ if __name__ == "__main__":
     permutations = Permutations(
                     base_folder = base_folder,
                     output_data_path = output_directory,
-                    task_type= args.task_type
+                    task_type= task_name
                 )
     
     permutations.start_permutations()
