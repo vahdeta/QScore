@@ -1,11 +1,12 @@
 import os
+import time
 import uuid
 import logging
 import argparse
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from permutations.permutations import Permutations
-from permutations.utils import convert_dicoms, get_series_description, post_q_score
-import time
+from permutations.utils import convert_dicoms, get_series_description, post_score
 
 if __name__ == "__main__":
 
@@ -49,16 +50,34 @@ if __name__ == "__main__":
                     output_data_path = output_directory,
                     task_type= task_name
                 )
-    
-    permutations.start_permutations()
-    q_score = permutations.get_q_score()
 
-    # Send q score to localhost for other Docker container to pick up
-    logging.info(f"Permutations complete. Got q score of : {q_score}")
+    permutations.start_analysis()
+    logging.info(f"Time to run first level analysis: {time_after_analysis - time_before_analysis}")
 
-    # Send q score to localhost for other Docker container to pick up
-    logging.info("Sending q score to localhost")
-    post_q_score(args.condition, q_score)
+    metrics = {
+        'q_score': permutations.get_q_score,
+        'compliance_score': permutations.get_compliance_score
+    }
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        # Submit tasks and keep track of corresponding futures
+        futures = {executor.submit(metric): name for name, metric in metrics.items()}
+
+        # Post tasks as they are completed
+        for future in as_completed(futures):
+            metric_name = futures[future]
+            try:
+                # Retrieve the result of the completed task
+                result = future.result()
+                # Process the result if needed
+                logging.info((f"{metric_name} task completed with result:", result))
+
+                # Post results to localhost
+                post_score(args.condition, metric_name, result)
+            except Exception as e:
+                # Handle any exceptions that occurred during the task
+                logging.error(f"{metric_name} task failed with exception:", e)
+
 
     # Remove output directory
     os.system(f"rm -rf {output_directory}")

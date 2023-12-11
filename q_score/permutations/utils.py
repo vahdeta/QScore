@@ -82,18 +82,18 @@ def get_nifti_name(input_directory: Path):
 
     return nifti_file_name
 
-def post_q_score(series_number: str, q_score: int):
+def post_score(series_number: str, metric_name: str, result: int):
     """
     series_number: Series number that data originated from
-    q_scr: Q score to be posted
+    metric_name: Name of metric to post, either q_score or compliance_score
 
     Returns: Status code of post request
     """
 
-    url = "http://localhost:5000/data/q_score"
+    url = f"http://localhost:5000/data/{metric_name}"
     data = {
         "SeriesNumber": series_number,
-        "QScore": q_score
+        metric_name: result
     }
 
     response = requests.post(url, json=data)
