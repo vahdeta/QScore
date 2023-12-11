@@ -52,7 +52,6 @@ if __name__ == "__main__":
                 )
 
     permutations.start_analysis()
-    logging.info(f"Time to run first level analysis: {time_after_analysis - time_before_analysis}")
 
     metrics = {
         'q_score': permutations.get_q_score,
@@ -77,7 +76,6 @@ if __name__ == "__main__":
             except Exception as e:
                 # Handle any exceptions that occurred during the task
                 logging.error(f"{metric_name} task failed with exception:", e)
-
 
     # Remove output directory
     os.system(f"rm -rf {output_directory}")

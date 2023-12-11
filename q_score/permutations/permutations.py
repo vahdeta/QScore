@@ -189,6 +189,12 @@ class Permutations:
             flirt.inputs.in_file = self.output_data_path / f"real.feat/stats/zstat{contrast}.nii.gz"
             flirt.inputs.reference = Path("/app/q_score/design/standard/MNI152_T1_4mm_brain.nii.gz")
 
+            # If the original image is 2x2x2, then resample it to 4x4x4
+            dimensions = nib.load(self.output_data_path / f"real.feat/stats/zstat{contrast}.nii.gz").header.get_zooms()
+            if dimensions == (2.0, 2.0, 2.0):
+                logging.info("Resampling image to 4x4x4")
+                flirt.inputs.apply_isoxfm = 4.0
+
             # Define the path to the 4x4x4 zstat image
             zstat_image = self.output_data_path / f"zstat{contrast}_standardized.nii.gz"
 
@@ -204,7 +210,6 @@ class Permutations:
 
             # Threshold z stat image at top 1%, top 5%, top 10% of values
             zstat_nii = nib.load(zstat_image)
-            logging.info(f"NEW IMAGE'S ZSTAT SIZE IS {zstat_nii.shape} and DIMENSIONS ARE {zstat_nii.header.get_zooms()}")
             zstat_data = zstat_nii.get_fdata()
             zstat_data = np.nan_to_num(zstat_data)
 
@@ -222,8 +227,6 @@ class Permutations:
             template_map = nib.load(template_map_path)
             template_map_data = template_map.get_fdata()
             template_map_data = np.nan_to_num(template_map_data)
-
-            logging.info(f"template map shape: {template_map_data.shape}")
 
             # Calculate the dice coefficient for each thresholded image
             dice_5_percent = self.get_dice_coefficient(zstat_data_5_percent, template_map_data)
