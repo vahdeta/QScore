@@ -1,12 +1,13 @@
 import os
-from typing import List, Optional
+import time
 import uuid
 import logging
 import argparse
 from pathlib import Path
+from typing import List, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from permutations.permutations import Permutations
-from permutations.utils import convert_dicoms, get_series_description, post_q_score
-import time
+from permutations.utils import convert_dicoms, get_series_description, post_score
 
 
 def run(
@@ -38,20 +39,39 @@ def run(
 
     # Start permutation analysis
     permutations = Permutations(
-        base_folder=base_folder,
-        output_data_path=output_directory,
-        task_type=task_name,
-    )
+                    base_folder = base_folder,
+                    output_data_path = output_directory,
+                    task_type= task_name
+                )
 
-    permutations.start_permutations()
-    q_score = permutations.get_q_score()
+    permutations.start_analysis()
 
-    # Send q score to localhost for other Docker container to pick up
-    logging.info(f"Permutations complete. Got q score of : {q_score}")
+    futures = {}
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        # Submit tasks and keep track of corresponding futures
+        futures[executor.submit(permutations.run_feat, 
+                            permutations.num_frames,
+                            permutations.tr_time,
+                            permutations.output_data_path / "truncated_bet_mcf.nii.gz",
+                            permutations.design_file_path,
+                            permutations.analysis_path
+                        )] = "q_score"
 
-    # Send q score to localhost for other Docker container to pick up
-    logging.info("Sending q score to localhost")
-    post_q_score(dicom_data["SeriesNumber"], q_score)
+        futures[executor.submit(permutations.get_compliance_score)] = "compliance_score"
+
+        for future in as_completed(futures):
+            # Get the name of the function that was run
+            metric = futures[future]
+
+            if metric == "q_score":
+                # Still need to compute the Q score
+                q_score = permutations.get_q_score()
+                logging.info(f"Q score: {q_score}")
+                post_score(task_name, metric, q_score)
+            elif metric == "compliance_score":
+                compliance_score = future.result()
+                logging.info(f"Compliance score: {compliance_score}")
+                post_score(task_name, metric, compliance_score)
 
     # Remove output directory
     os.system(f"rm -rf {output_directory}")
