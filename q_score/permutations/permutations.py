@@ -29,7 +29,7 @@ class Permutations:
         if not self.analysis_path.exists():
             self.analysis_path.mkdir(parents=True, exist_ok=True)
 
-        self.filtered_data = self.output_data_path / "real.feat/filtered_func_data"
+        self.filtered_data = self.output_data_path / "truncated_bet_mcf.nii.gz"
         self.num_threads = 10
         self.iterations = 20
         self.percent_to_permute = .1
@@ -74,9 +74,6 @@ class Permutations:
         mcflirt.inputs.in_file = bet_image_file_path
         mcflirt.inputs.out_file = mcflirt_image_file_path
         mcflirt.run()
-
-        # Run feat on the truncated data
-        self.run_feat(self.num_frames, self.tr_time, mcflirt_image_file_path, self.design_file_path, self.analysis_path)
 
     def run_permutations_with_feat(self, num_permuted_frames: int, num_frames: int, tr_time: float, iteration_path: Path):
         """
@@ -148,6 +145,72 @@ class Permutations:
         feat.inputs.fsf_file = new_design_file_path
         feat.run()
     
+    def do_registration(self, num_contrasts):
+        """
+        Register the example_func to standard space
+
+        Args:
+            num_contrasts: Number of contrasts
+        """
+
+        # Register the example_func to standard space
+
+        fslroi = fsl.ExtractROI()
+
+        fslroi.inputs.in_file = f"{self.output_data_path}/real.feat/filtered_func_data.nii.gz"
+        fslroi.inputs.roi_file = f"{self.output_data_path}/example_func.nii.gz"
+        fslroi.inputs.t_min = 78
+        fslroi.inputs.t_size = 1
+
+        fslroi.run()
+
+        # Run standard space brain extraction
+        fslmaths = fsl.ImageMaths()
+        fslmaths.inputs.in_file = f"{self.base_folder}/design/standard/MNI152_T1_4mm_brain.nii.gz"
+        fslmaths.inputs.out_file = f"{self.output_data_path}/standard.nii.gz"
+
+        fslmaths.run()
+
+        # Run flirt
+        flirt = fsl.FLIRT()
+        flirt.inputs.in_file = f"{self.output_data_path}/example_func.nii.gz"
+        flirt.inputs.reference = f"{self.output_data_path}/standard.nii.gz"
+        flirt.inputs.out_file = f"{self.output_data_path}/example_func2standard.nii.gz"
+        flirt.inputs.out_matrix_file = f"{self.output_data_path}/example_func2standard.mat"
+        flirt.inputs.cost = "corratio"
+        flirt.inputs.dof = 12
+        flirt.inputs.searchr_x = [-90, 90]
+        flirt.inputs.searchr_y = [-90, 90]
+        flirt.inputs.searchr_z = [-90, 90]
+        flirt.inputs.interp = "trilinear"
+
+        flirt.run()
+
+        # Run convert_xfm
+        convert_xfm_node = fsl.ConvertXFM()
+        convert_xfm_node.inputs.in_file = f"{self.output_data_path}/example_func2standard.mat"
+        convert_xfm_node.inputs.out_file = f"{self.output_data_path}/standard2example_func.mat"
+        convert_xfm_node.inputs.invert_xfm = True
+
+        convert_xfm_node.run()
+
+        for contrast in range(1, num_contrasts+1):  
+            # Register the zstat image to standard space
+            zstat_flirt = fsl.FLIRT()
+
+            # Set input parameters
+            zstat_flirt.inputs.in_file = self.output_data_path / f"real.feat/stats/zstat{contrast}.nii.gz"
+            zstat_flirt.inputs.reference = f"{self.base_folder}/design/standard/MNI152_T1_4mm_brain.nii.gz"
+            zstat_flirt.inputs.apply_xfm = True
+            zstat_flirt.inputs.in_matrix_file = self.output_data_path / f"example_func2standard.mat"
+
+            # Define the path to the 4x4x4 zstat image
+            zstat_image = self.output_data_path / f"zstat{contrast}_registered.nii.gz"
+            zstat_flirt.inputs.out_file = zstat_image
+            
+            # Run flirt
+            zstat_flirt.run()
+        
     def get_dice_coefficient(self, thresholded_image, template_map_data):
         """
         Calculate the dice coefficient between the thresholded image and the template map
@@ -178,65 +241,49 @@ class Permutations:
         q_scores = []
 
         # Get the number of contrasts
-        num_contrast = 1 if self.task_type == "objnam" else 2
+        num_contrasts = 1 if self.task_type == "objnam" else 2
+
+        # Register the zstat image to standard space
+        self.do_registration(num_contrasts)
         
-        for contrast in range(1, num_contrast+1):  
-
-            # Register the zstat image to standard space
-            flirt = fsl.FLIRT()
-
-            # Set input parameters
-            flirt.inputs.in_file = self.output_data_path / f"real.feat/stats/zstat{contrast}.nii.gz"
-            flirt.inputs.reference = Path("/app/q_score/design/standard/MNI152_T1_4mm_brain.nii.gz")
-
-            # If the original image is 2x2x2, then resample it to 4x4x4
-            dimensions = nib.load(self.output_data_path / f"real.feat/stats/zstat{contrast}.nii.gz").header.get_zooms()
-            if dimensions == (2.0, 2.0, 2.0):
-                logging.info("Resampling image to 4x4x4")
-                flirt.inputs.apply_isoxfm = 4.0
-
-            # Define the path to the 4x4x4 zstat image
-            zstat_image = self.output_data_path / f"zstat{contrast}_standardized.nii.gz"
-
-            flirt.inputs.out_file = zstat_image
+        for contrast in range(1, num_contrasts+1):  
             
-            # Run flirt
-            flirt.run()
-
             if self.task_type == "objnam":
-                template_map_path = self.base_folder / f"design/{self.task_type}/template_map_binarized.nii.gz"
+                template_map_path = self.base_folder / f"design/{self.task_type}/template_mask.nii.gz"
             else:
-                template_map_path = self.base_folder / f"design/{self.task_type}/template_map_contrast{contrast}_binarized.nii.gz"
+                template_map_path = self.base_folder / f"design/{self.task_type}/template_contrast{contrast}_mask.nii.gz"
+            
+            zstat_image = self.output_data_path / f"zstat{contrast}_registered.nii.gz"
 
-            # Threshold z stat image at top 1%, top 5%, top 10% of values
+            # Load z stat image
             zstat_nii = nib.load(zstat_image)
             zstat_data = zstat_nii.get_fdata()
             zstat_data = np.nan_to_num(zstat_data)
 
-            # Calculate the threshold values
-            top_5_percent = np.percentile(zstat_data, 95)
-            top_10_percent = np.percentile(zstat_data, 90)
-            top_15_percent = np.percentile(zstat_data, 85)
-
-            # Threshold the zstat image at the top 1%, top 5%, top 10% of values
-            zstat_data_5_percent = np.where(zstat_data > top_5_percent, 1, 0)
-            zstat_data_10_percent = np.where(zstat_data > top_10_percent, 1, 0)
-            zstat_data_15_percent = np.where(zstat_data > top_15_percent, 1, 0)
+            # Load the standard space template and ventricle mask to mask out the ventricles and other non-brain areas
+            standard_space_template_data = nib.load(self.base_folder / "design/standard/MNI152_T1_4mm_brain.nii.gz").get_fdata()
+            ventricle_mask = nib.load(self.base_folder / "design/standard/MNI152_T1_ventricles_4mm.nii.gz").get_fdata()
+            zstat_data = np.where((standard_space_template_data != 0) & (ventricle_mask == 0), zstat_data, 0)
 
             # Load the template map for comparison
             template_map = nib.load(template_map_path)
             template_map_data = template_map.get_fdata()
             template_map_data = np.nan_to_num(template_map_data)
+            
+            # Calculate the threshold values
+            threshold_percents = [99.5, 99, 97, 95, 90]
+            dice_coefficients = []
 
-            # Calculate the dice coefficient for each thresholded image
-            dice_5_percent = self.get_dice_coefficient(zstat_data_5_percent, template_map_data)
-            dice_10_percent = self.get_dice_coefficient(zstat_data_10_percent, template_map_data)
-            dice_15_percent = self.get_dice_coefficient(zstat_data_15_percent, template_map_data)
-
-            logging.info(f"Dice coefficient for contrast {contrast}: 5%: {dice_5_percent}, 10%: {dice_10_percent} 15%: {dice_15_percent}")
+            # Calculate the dice coefficient for each threshold
+            for threshold in threshold_percents:
+                percentile = np.percentile(zstat_data, threshold)
+                logging.info(f"Percentile for contrast {contrast}: {threshold}: {percentile}")
+                dice = self.get_dice_coefficient(np.where(zstat_data > percentile, 1, 0), template_map_data)
+                logging.info(f"Dice coefficient for contrast {contrast}: {threshold}: {dice}")
+                dice_coefficients.append(dice)
 
             # Pick the best dice coefficient
-            best_dice = max(dice_5_percent, dice_10_percent, dice_15_percent)
+            best_dice = max(dice_coefficients)
             logging.info(f"Best dice coefficient for contrast {contrast}: {best_dice}")
             q_scores.append(min(int((best_dice) * 100 / (0.8)), 100))
 
@@ -254,21 +301,22 @@ class Permutations:
 
         num_permuted_frames = int(math.ceil(self.percent_to_permute * self.num_frames))
 
-        # Start the permutations in a thread pool
-        with ThreadPoolExecutor(max_workers=self.num_threads) as executor:
-            for i in range(self.iterations):
-                iteration_path = self.output_data_path / f"permutation_{i}"
-                executor.submit(self.run_permutations_with_feat, num_permuted_frames, self.num_frames, self.tr_time, iteration_path)
-
         # Load the mask from the feat file
-        mask_nii = nib.load(f'{self.output_data_path}/real.feat/mask.nii.gz')
+        mask_nii = nib.load(f'{self.output_data_path}/truncated_bet_mask.nii.gz')
         mask = mask_nii.get_fdata().astype(bool)
 
         # Get the number of contrasts
         num_contrast = 1 if self.task_type == "objnam" else 2
+        compliance_scores = []
+
+        # Start the permutations in a thread pool
+        with ThreadPoolExecutor(max_workers=self.num_threads) as executor:
+            futures = {}
+            for i in range(self.iterations):
+                iteration_path = self.output_data_path / f"permutation_{i}"
+                futures[executor.submit(self.run_permutations_with_feat, num_permuted_frames, self.num_frames, self.tr_time, iteration_path)] = [i]
 
         # Loop through all iterations and load permuted data for each contrast
-        compliance_scores = []
         for contrast in range(1, num_contrast+1):
             # Initialize a matrix to store permuted data
             all_data_mat = np.zeros((np.sum(mask), self.iterations))

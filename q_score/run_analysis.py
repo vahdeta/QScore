@@ -53,29 +53,32 @@ if __name__ == "__main__":
 
     permutations.start_analysis()
 
-    metrics = {
-        'q_score': permutations.get_q_score,
-        'compliance_score': permutations.get_compliance_score
-    }
-
+    futures = {}
     with ThreadPoolExecutor(max_workers=2) as executor:
         # Submit tasks and keep track of corresponding futures
-        futures = {executor.submit(metric): name for name, metric in metrics.items()}
+        futures[executor.submit(permutations.run_feat, 
+                            permutations.num_frames,
+                            permutations.tr_time,
+                            permutations.output_data_path / "truncated_bet_mcf.nii.gz",
+                            permutations.design_file_path,
+                            permutations.analysis_path
+                        )] = "q_score"
 
-        # Post tasks as they are completed
+        futures[executor.submit(permutations.get_compliance_score)] = "compliance_score"
+
         for future in as_completed(futures):
-            metric_name = futures[future]
-            try:
-                # Retrieve the result of the completed task
-                result = future.result()
-                # Process the result if needed
-                logging.info((f"{metric_name} task completed with result:", result))
+            # Get the name of the function that was run
+            metric = futures[future]
 
-                # Post results to localhost
-                post_score(args.condition, metric_name, result)
-            except Exception as e:
-                # Handle any exceptions that occurred during the task
-                logging.error(f"{metric_name} task failed with exception:", e)
+            if metric == "q_score":
+                # Still need to compute the Q score
+                q_score = permutations.get_q_score()
+                logging.info(f"Q score: {q_score}")
+                post_score(task_name, metric, q_score)
+            elif metric == "compliance_score":
+                compliance_score = future.result()
+                logging.info(f"Compliance score: {compliance_score}")
+                post_score(task_name, metric, compliance_score)
 
     # Remove output directory
     os.system(f"rm -rf {output_directory}")
