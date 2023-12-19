@@ -1,11 +1,11 @@
 import math
 import logging
-from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
 import numpy as np
-from scipy.spatial import distance
 import nibabel as nib
+from pathlib import Path
+from scipy.spatial import distance
 from nipype.interfaces import fsl
+from concurrent.futures import ThreadPoolExecutor
 from permutations.utils import get_nifti_name
 
 class Permutations:
