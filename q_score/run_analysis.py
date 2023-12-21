@@ -6,8 +6,8 @@ import argparse
 from pathlib import Path
 from typing import List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from permutations.permutations import Permutations
-from permutations.utils import convert_dicoms, get_series_description, post_score
+from q_score.permutations.permutations import Permutations
+from q_score.permutations.utils import convert_dicoms, get_series_description, post_score
 
 
 def run(

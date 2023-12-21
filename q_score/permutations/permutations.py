@@ -7,7 +7,7 @@ from pathlib import Path
 from scipy.spatial import distance
 from nipype.interfaces import fsl
 from concurrent.futures import ThreadPoolExecutor
-from permutations.utils import get_nifti_name
+from q_score.permutations.utils import get_nifti_name
 
 class Permutations:
     def __init__(self, base_folder: Path, output_data_path: Path, task_type: str):
