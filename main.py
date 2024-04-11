@@ -4,7 +4,7 @@ import os
 
 if __name__ == "__main__":
     
-    # File location for listening for incoming json files
-    json_directory = Path(os.environ.get("JSON_DIR", "/incoming"))
+    # File location for listening for incoming nifti files
+    nifti_directory = Path(os.environ.get("NIFTI_DIR", "/incoming"))
 
-    listener.start_listener(json_directory)
+    listener.start_listener(nifti_directory)

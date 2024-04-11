@@ -3,22 +3,25 @@ import logging
 import numpy as np
 import nibabel as nib
 from pathlib import Path
-from scipy.spatial import distance
 from nipype.interfaces import fsl
+from scipy.spatial import distance
 from concurrent.futures import ThreadPoolExecutor
-from permutations.utils import get_nifti_name
+from permutations.utils import get_series_description
 
 class Permutations:
-    def __init__(self, base_folder: Path, output_data_path: Path, task_type: str):
+    def __init__(self, base_folder: Path, output_data_path: Path, original_nifti: Path):
         """
         base_folder: Path to folder to python package
         output_data_path: Path to output data directory, where FEAT and NIFTI files will be written
-        task_type: String representing the type of task (e.g. object_naming, motor)
-        num_cpus: Number of CPUs (or threads) to use for analysis
+        original_nifti: Path to original NIFTI file
         """        
 
         self.base_folder = base_folder
-        self.task_type = task_type
+        self.original_nifti = original_nifti
+        self.task_type = get_series_description(original_nifti)
+        if self.task_type == "error":
+            raise Exception("Error reading task type from NIFTI file name")
+
         self.design_file_path = self.base_folder / f"design/{self.task_type}/{self.task_type}.fsf"
         self.design_file_with_confound_path = self.base_folder / f"design/{self.task_type}/{self.task_type}_with_confounds.fsf"
 
@@ -45,13 +48,9 @@ class Permutations:
         """
 
         logging.info("Starting first level analysis")
-
-        # Look into data file path and get the name of the nifti file
-        nifti_name = get_nifti_name(self.output_data_path)
-
+        
         # Load the original data as a nifti with nibabel
-        original_image_file_path = self.output_data_path / nifti_name
-        original_image = nib.load(original_image_file_path)
+        original_image = nib.load(self.original_nifti)
         self.tr_time = original_image.header['pixdim'][4]
 
         # Truncate the original data by 4 frames
