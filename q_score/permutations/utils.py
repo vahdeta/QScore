@@ -16,13 +16,17 @@ def get_series_description(nifti_path: Path):
     """
 
     nifti_file_name = nifti_path.name
-    series_description = nifti_file_name.split("_")
-    task_name = series_description[1].lower()
+    series_number, series_description = nifti_file_name.split("_", 1)
+    lc_series_description = series_description.lower()
 
     # Make sure that task name is either objnam or motor
-    if task_name not in ["objnam", "motor"]:
-        logging.error("Task name not objnam or motor, defaulting to objnam")
-        return "error"
+    if "motor" in lc_series_description:
+        task_name = "motor"
+    elif "objnam" in lc_series_description:
+        task_name = "objnam"
+    else:
+        logging.warning("Task name not objnam or motor, defaulting to objnam")
+        task_name = "objnam"
 
     return task_name
 
@@ -39,12 +43,10 @@ def post_score(task_name: str, metric_name: str, result: int):
     data = {}
     if task_name == "invalid":
         data = {
-            "task_name": "invalid",
             "q_score": 0
         }
     else:
         data = {
-            "task_name": task_name,
             metric_name: result
         }
 
