@@ -37,19 +37,17 @@ def post_score(task_name: str, metric_name: str, result: int):
 
     Returns: Status code of post request
     """
-
-    url = f"http://localhost:5000/data/{metric_name}"
-
-    data = {}
     if task_name == "invalid":
-        data = {
-            "q_score": 0
-        }
+        response = post_score('', 'q_score', -1)
+        response = post_score('', 'compliance_score', -1)
+        return response
     else:
         data = {
             metric_name: result
         }
 
-    response = requests.post(url, json=data)
+        url = f"http://localhost:5000/data/{metric_name}"
 
-    return response.status_code
+        response = requests.post(url, json=data)
+
+        return response.status_code
