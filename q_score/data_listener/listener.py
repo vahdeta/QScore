@@ -60,6 +60,10 @@ def start_listener(nifti_directory: Path):
                 call_analysis_script(file_to_analyze)
 
                 logging.info(f"Finished analysis for {file_to_analyze}")
+                try:
+                    os.remove(file_to_analyze)
+                except Exception as e:
+                    logging.error(f"Failed to delete {file_to_analyze}")
 
             time.sleep(1)
     except KeyboardInterrupt:
