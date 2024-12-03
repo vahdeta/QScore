@@ -284,9 +284,9 @@ class Permutations:
             # Pick the best dice coefficient
             best_dice = max(dice_coefficients)
             logging.info(f"Best dice coefficient for contrast {contrast}: {best_dice}")
-            q_scores.append(min(int((best_dice) * 100 / (0.8)), 100))
+            q_scores.append(min((best_dice) * 100 / (0.8), 100))
 
-        unscaled_q_score = int(np.mean(q_scores))
+        unscaled_q_score = np.mean(q_scores)
 
         # Get the scaling parameters for this specific task
         scaling_params = load_scaling_params(path_to_params=Path(self.base_folder / f"design/scales/{self.task_type}_scaling_params.json"))

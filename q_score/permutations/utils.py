@@ -45,7 +45,7 @@ def get_scaled_score(unscaled_score, params):
     Returns: scaled_score: integer representing QScore, with range of 1-100
     """
     scaled_score = ((unscaled_score - params['data_min']) / (params['data_max'] - params['data_min'])) * 100
-    scaled_score = int(np.clip(scaled_score, 1, 100))
+    scaled_score = round(np.clip(scaled_score, 1, 100))
     return scaled_score
 
 def post_score(task_name: str, metric_name: str, result: int):
