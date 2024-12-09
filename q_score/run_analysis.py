@@ -8,6 +8,7 @@ from nipype.interfaces import fsl
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from permutations.permutations import Permutations
 from permutations.utils import post_score
+import traceback
 
 if __name__ == "__main__":
 
@@ -59,23 +60,14 @@ if __name__ == "__main__":
             futures[executor.submit(permutations.get_compliance_score)] = "compliance_score"
 
             for future in as_completed(futures):
-                # Get the name of the function that was run
-                metric = futures[future]
-
-                if metric == "q_score":
-                    # Still need to compute the Q score
-                    q_score = permutations.get_q_score()
-                    logging.info(f"Q score: {q_score}")
-                    post_score(permutations.series_number, permutations.task_type, metric, q_score)
-                elif metric == "compliance_score":
-                    compliance_score = future.result()
-                    logging.info(f"Compliance score: {compliance_score}")
-                    post_score(permutations.series_number, permutations.task_type, metric, compliance_score)
+                # Still need to compute the Q score
+                q_score = permutations.get_q_score()
+                logging.info(f"Q score: {q_score}")
+                post_score(permutations.series_number, permutations.task_type, q_score)
     except Exception as e:
         logging.error(f"Error setting up permutations: {e}")
-        # Post an error score
-        series_number = getattr(permutations, 'series_number', "ERROR")
-        post_score(series_number, "invalid", "error", 0)
+        traceback.print_exc
+        post_score(permutations.series_number, -1)
 
     # Remove output directory
     os.system(f"rm -rf {output_directory}")
