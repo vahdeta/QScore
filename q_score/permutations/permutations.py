@@ -19,7 +19,7 @@ class Permutations:
 
         self.base_folder = base_folder
         self.original_nifti = original_nifti
-        self.task_type = get_series_description(original_nifti)
+        self.series_number, self.task_type = get_series_description(original_nifti)
         if self.task_type == "error":
             raise Exception("Error reading task type from NIFTI file name")
 

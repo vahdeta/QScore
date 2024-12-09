@@ -66,15 +66,16 @@ if __name__ == "__main__":
                     # Still need to compute the Q score
                     q_score = permutations.get_q_score()
                     logging.info(f"Q score: {q_score}")
-                    post_score(permutations.task_type, metric, q_score)
+                    post_score(permutations.series_number, permutations.task_type, metric, q_score)
                 elif metric == "compliance_score":
                     compliance_score = future.result()
                     logging.info(f"Compliance score: {compliance_score}")
-                    post_score(permutations.task_type, metric, compliance_score)
+                    post_score(permutations.series_number, permutations.task_type, metric, compliance_score)
     except Exception as e:
         logging.error(f"Error setting up permutations: {e}")
         # Post an error score
-        post_score("invalid", "error", 0)
-  
+        series_number = getattr(permutations, 'series_number', "ERROR")
+        post_score(series_number, "invalid", "error", 0)
+
     # Remove output directory
     os.system(f"rm -rf {output_directory}")
