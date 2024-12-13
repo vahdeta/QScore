@@ -63,7 +63,7 @@ if __name__ == "__main__":
                 # Still need to compute the Q score
                 q_score = permutations.get_q_score()
                 logging.info(f"Q score: {q_score}")
-                post_score(permutations.series_number, permutations.task_type, q_score)
+                post_score(permutations.series_number, q_score)
     except Exception as e:
         logging.error(f"Error setting up permutations: {e}")
         traceback.print_exc
