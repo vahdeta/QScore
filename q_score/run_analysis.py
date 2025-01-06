@@ -8,7 +8,6 @@ from nipype.interfaces import fsl
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from permutations.permutations import Permutations
 from permutations.utils import post_score
-import traceback
 
 if __name__ == "__main__":
 
@@ -57,8 +56,6 @@ if __name__ == "__main__":
                                 permutations.analysis_path
                             )] = "q_score"
 
-            futures[executor.submit(permutations.get_compliance_score)] = "compliance_score"
-
             for future in as_completed(futures):
                 # Still need to compute the Q score
                 q_score = permutations.get_q_score()
@@ -66,7 +63,6 @@ if __name__ == "__main__":
                 post_score(permutations.series_number, q_score)
     except Exception as e:
         logging.error(f"Error setting up permutations: {e}")
-        traceback.print_exc
         post_score(permutations.series_number, -1)
 
     # Remove output directory

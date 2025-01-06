@@ -75,37 +75,6 @@ class Permutations:
         mcflirt.inputs.out_file = mcflirt_image_file_path
         mcflirt.run()
 
-    def run_permutations_with_feat(self, num_permuted_frames: int, num_frames: int, tr_time: float, iteration_path: Path):
-        """
-        Run permutation on single iteration with FSL feat
-
-        Args:
-            num_permuted_frames: Number of frames to permute
-            num_frames: Number of frames in the data file
-            tr_time: TR time of the data file
-            iteration_path: Path to directory where permutation data will be written
-        """
-
-        logging.info(f"Running permutation for {iteration_path}")
-
-        # Randomly permute the frames, and select a subset of the randomly selected frames
-        random_frame_order = np.random.permutation(num_frames)
-        frames_to_permute = random_frame_order[:num_permuted_frames]
-
-        # Create confound vector
-        confound_vector = np.zeros((num_frames, num_permuted_frames), dtype=int)
-
-        # Set the confound vector to 1 for the frames that are permuted
-        for f in range(len(frames_to_permute)):
-            confound_vector[frames_to_permute[f]][f] = 1
-
-        confound_file_path = self.output_data_path/ f"{iteration_path}_confound.txt"
-
-        # Save the confound vector to a file
-        np.savetxt(confound_file_path, confound_vector, delimiter=' ', fmt='%d')
-
-        self.run_feat(num_frames, tr_time, self.filtered_data, self.design_file_with_confound_path, iteration_path, confound_file_path)
-
     def run_feat(self, num_frames: int, tr_time: float, data_file_path: Path, design_file_path: Path, analysis_path: Path, confound_file_path=None):
         """
         Adjust design file as needed and launch FSL feat
@@ -294,55 +263,3 @@ class Permutations:
         q_score = get_scaled_score(unscaled_q_score, scaling_params)
 
         return q_score
-
-    def get_compliance_score(self):
-        """
-        Calculate the compliance score by permuting data and calculating the similarity between the permuted data and the real data.
-
-        Returns:
-            compliance_score: The compliance score for the permutation test
-        """
-
-        num_permuted_frames = int(math.ceil(self.percent_to_permute * self.num_frames))
-
-        # Load the mask from the feat file
-        mask_nii = nib.load(f'{self.output_data_path}/truncated_bet_mask.nii.gz')
-        mask = mask_nii.get_fdata().astype(bool)
-
-        # Get the number of contrasts
-        num_contrast = 1 if self.task_type == "objnam" else 2
-        compliance_scores = []
-
-        # Start the permutations in a thread pool
-        with ThreadPoolExecutor(max_workers=self.num_threads) as executor:
-            futures = {}
-            for i in range(self.iterations):
-                iteration_path = self.output_data_path / f"permutation_{i}"
-                futures[executor.submit(self.run_permutations_with_feat, num_permuted_frames, self.num_frames, self.tr_time, iteration_path)] = [i]
-
-        # Loop through all iterations and load permuted data for each contrast
-        for contrast in range(1, num_contrast+1):
-            # Initialize a matrix to store permuted data
-            all_data_mat = np.zeros((np.sum(mask), self.iterations))
-            for i in range(self.iterations):
-                permuted_image = f"{self.output_data_path}/permutation_{i}.feat/stats/zstat{contrast}.nii.gz"
-                permuted_data_nii = nib.load(permuted_image)
-                permuted_data = permuted_data_nii.get_fdata()
-                all_data_mat[:, i] = permuted_data[mask]
-
-            # Calculate pairwise correlation between all iterations
-            similarity_mat = 1 - distance.cdist(all_data_mat.T, all_data_mat.T, 'correlation')
-
-            # Extract the lower triangular values
-            iteration_similarity_lowertri = np.tril_indices(self.iterations, k=-1)
-            similarities = similarity_mat[iteration_similarity_lowertri]
-
-            # Calculate the mean similarity divided by the standard deviation of similarities
-            compliance_scores.append(int(np.mean(similarities) / np.std(similarities)))
-
-        # Take the average of the compliance scores across contrasts
-        compliance_score = int(np.mean(compliance_scores))
-
-        return compliance_score
-
-

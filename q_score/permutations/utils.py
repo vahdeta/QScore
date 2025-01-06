@@ -67,9 +67,6 @@ def post_score(series_number: int, result: float):
     }
 
     url = f"http://localhost:5000/data/q_score"
-    logging.critical(f'Sending {data} to {url}')
-
     response = requests.post(url, json=data)
-    logging.critical(f'got response {response}')
 
     return response.status_code
