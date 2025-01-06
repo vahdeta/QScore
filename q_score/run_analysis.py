@@ -56,8 +56,6 @@ if __name__ == "__main__":
                                 permutations.analysis_path
                             )] = "q_score"
 
-            futures[executor.submit(permutations.get_compliance_score)] = "compliance_score"
-
             for future in as_completed(futures):
                 # Get the name of the function that was run
                 metric = futures[future]
@@ -67,10 +65,6 @@ if __name__ == "__main__":
                     q_score = permutations.get_q_score()
                     logging.info(f"Q score: {q_score}")
                     post_score(permutations.task_type, metric, q_score)
-                elif metric == "compliance_score":
-                    compliance_score = future.result()
-                    logging.info(f"Compliance score: {compliance_score}")
-                    post_score(permutations.task_type, metric, compliance_score)
     except Exception as e:
         logging.error(f"Error setting up permutations: {e}")
         # Post an error score

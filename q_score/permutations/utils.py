@@ -17,7 +17,6 @@ def get_series_description(nifti_path: Path):
     nifti_file_name = nifti_path.name
     series_description = nifti_file_name.split("_")
     task_name = series_description[1].lower()
-
     # Make sure that task name is either objnam or motor
     if task_name not in ["objnam", "motor"]:
         logging.error("Task name not objnam or motor, defaulting to objnam")
