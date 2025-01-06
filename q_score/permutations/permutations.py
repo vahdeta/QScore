@@ -34,9 +34,6 @@ class Permutations:
             self.analysis_path.mkdir(parents=True, exist_ok=True)
 
         self.filtered_data = self.output_data_path / "truncated_bet_mcf.nii.gz"
-        self.num_threads = int(os.environ.get("Q_SCORE_THREADS", 10))
-        self.iterations = int(os.environ.get("Q_SCORE_PERMUTATIONS", 20))
-        self.percent_to_permute = .1
         self.num_frames = 161
         self.tr_time = 1.8
 
