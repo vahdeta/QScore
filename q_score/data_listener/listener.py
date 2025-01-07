@@ -30,6 +30,11 @@ class NiftiFileHandler(FileSystemEventHandler):
             logging.info("New nifti file detected")
             logging.info(event.src_path)
             analysis_queue.put(event.src_path)
+        else:
+            try:
+                os.remove(event.src_path)
+            except Exception as e:
+                logging.error('Failed to remove extraneous files from watched dir.')
 
 def start_listener(nifti_directory: Path):
     """
