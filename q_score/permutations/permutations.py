@@ -57,10 +57,24 @@ class Permutations:
         nib.save(truncated_image, truncated_image_file_path)
         self.num_frames = truncated_image.shape[3]
 
+        # Get voxel size
+        voxel_size = original_image.header.get_zooms()[0]
+        truncated_file_name = "truncated.nii.gz" if voxel_size == 4.0 else "truncated_4mm.nii.gz"
+        
+        # Rescale to 4mm if needed
+        if voxel_size != 4.0:
+            logging.info(f"Original image was of voxel size {original_image.header.get_zooms()}. Rescaling it to 4mm voxels.")
+            flirt = fsl.FLIRT()
+            flirt.inputs.in_file = self.output_data_path / "truncated.nii.gz"
+            flirt.inputs.reference = f"{self.base_folder}/design/standard/MNI152_T1_4mm_brain.nii.gz"
+            flirt.inputs.out_file = self.output_data_path / truncated_file_name
+            flirt.inputs.apply_isoxfm = 4
+            flirt.run()
+       
         # Run brain extraction on truncated data
         bet_image_file_path = self.output_data_path / "truncated_bet.nii.gz"
         bet = fsl.BET()
-        bet.inputs.in_file = truncated_image_file_path
+        bet.inputs.in_file = self.output_data_path / truncated_file_name
         bet.inputs.out_file = bet_image_file_path
         bet.inputs.functional = True
         bet.run()
